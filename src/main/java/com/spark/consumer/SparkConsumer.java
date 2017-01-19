@@ -28,10 +28,10 @@ public final class SparkConsumer {
     public static void main(String[] args) throws Exception {
         if (args.length < 5) {
             System.err.println("Usage: SparkConsumer <topics> <mapping_table_path> <data_warehouse_path> <duration> <master url>\n" +
-                    "  <topics> is a list of one or more kafka topics to consume from\n\n" +
-                    "  <mapping_table_path> is the table path that contains the mapping \n\n" +
-                    "  <data_ware_house> is the location where the parquet files are stored\n\n" +
-                    "  <duration> is the batch interval in seconds\n\n" +
+                    "  <topics> is a list of one or more kafka topics to consume from\n" +
+                    "  <mapping_table_path> is the table path that contains the mapping \n" +
+                    "  <data_ware_house> is the location where the parquet files are stored\n" +
+                    "  <duration> is the batch interval in seconds\n" +
                     "  <master url> is the master url\n\n");
             System.exit(1);
         }
