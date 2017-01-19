@@ -47,7 +47,7 @@ public final class SparkConsumer {
         }
 
         // Create context with batch interval
-        SparkConf sparkConf = new SparkConf().setAppName("JavaDirectKafkaWordCount").setMaster(masterUrl);
+        SparkConf sparkConf = new SparkConf().setAppName("SparkConsumer").setMaster(masterUrl);
 
         JavaStreamingContext jssc = new JavaStreamingContext(sparkConf, Durations.seconds(Integer.parseInt(duration)));
 
