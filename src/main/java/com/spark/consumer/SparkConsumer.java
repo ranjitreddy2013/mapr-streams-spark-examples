@@ -2,6 +2,7 @@ package com.spark.consumer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.Function;
@@ -18,29 +19,37 @@ import org.apache.spark.streaming.kafka.v09.KafkaUtils;
 import scala.Tuple2;
 
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.*;
-
-import static com.spark.consumer.Constants.DW_DIR_NAME;
-import static com.spark.consumer.Constants.DW_LOCATION;
 
 
 public final class SparkConsumer {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public static void main(String[] args) throws Exception {
-        if (args.length < 1) {
-            System.err.println("Usage: SparkConsumer <topics>\n" +
-                    "  <topics> is a list of one or more kafka topics to consume from\n\n");
+        if (args.length < 5) {
+            System.err.println("Usage: SparkConsumer <topics> <mapping_table_path> <data_warehouse_path> <duration> <master url>\n" +
+                    "  <topics> is a list of one or more kafka topics to consume from\n\n" +
+                    "  <mapping_table_path> is the table path that contains the mapping \n\n" +
+                    "  <data_ware_house> is the location where the parquet files are stored\n\n" +
+                    "  <duration> is the batch interval in seconds\n\n" +
+                    "  <master url> is the master url\n\n");
             System.exit(1);
         }
 
         String topics = args[0];
+        final String tablePath = args[1];  //e.g. "/user/ranjitlingaiah/devicetablemapping"
+        final String dataWareHouseLocation = args[2];
+        final String duration = args[3];
+        String masterUrl = args[4];
 
-        // Create context with a 2 seconds batch interval
-        SparkConf sparkConf = new SparkConf().setAppName("JavaDirectKafkaWordCount").setMaster("local[2]").set("spark.executor.memory","1g");
+        if (StringUtils.isEmpty(masterUrl)) {
+            masterUrl = "local[2]";
+        }
 
-        JavaStreamingContext jssc = new JavaStreamingContext(sparkConf, Durations.seconds(2));
+        // Create context with batch interval
+        SparkConf sparkConf = new SparkConf().setAppName("JavaDirectKafkaWordCount").setMaster(masterUrl);
+
+        JavaStreamingContext jssc = new JavaStreamingContext(sparkConf, Durations.seconds(Integer.parseInt(duration)));
 
         Set<String> topicsSet = new HashSet<>(Arrays.asList(topics.split(",")));
         Map<String, String> kafkaParams = new HashMap<>();
@@ -68,13 +77,13 @@ public final class SparkConsumer {
             public String call(Tuple2<String, String> tuple2) {
 
                 String s = tuple2._2();
-                System.out.println("Before updating the json:" + s);
+                System.out.println("Incoming json:" + s);
 
                 JsonNode incomingJson = null;
                 JsonNode transformedJson = null;
                 try {
                     incomingJson = mapper.readTree(s);
-                    transformedJson = JsonUtil.transformJson(incomingJson);
+                    transformedJson = JsonUtil.transformJson(incomingJson, tablePath);
 
                 }catch (IOException ioex) {
                     ioex.printStackTrace();
@@ -83,7 +92,7 @@ public final class SparkConsumer {
                 String outJson = null;
                 try {
                     outJson = mapper.writeValueAsString(transformedJson);
-                    System.out.println("Transformed:" + outJson);
+                    System.out.println("Transformed JSON:" + outJson);
                 }catch(Exception ex) {
                     ex.printStackTrace();
                 }
@@ -97,14 +106,13 @@ public final class SparkConsumer {
             @Override
             public void call(JavaRDD<String> rdd, Time time) {
                 SparkSession spark = JavaSparkSessionSingleton.getInstance(rdd.context().getConf());
-                System.out.println("Call...");
 
                 if (!rdd.isEmpty()) {
                     Dataset<Row> data = spark.read().json(rdd);
                     data.printSchema();
                     data.show();
 
-                    data.repartition(1).write().partitionBy("table", "date").parquet(DW_LOCATION + getDateString() + DW_DIR_NAME);
+                    data.repartition(1).write().partitionBy("table", "date").parquet(dataWareHouseLocation);
                 }
             }
         });
@@ -114,11 +122,4 @@ public final class SparkConsumer {
         jssc.start();
         jssc.awaitTermination();
     }
-
-    private static String getDateString()  {
-        SimpleDateFormat sd = new SimpleDateFormat(Constants.PARTITION_PATTERN);
-        return sd.format(new Date());
-    }
-
-
 }

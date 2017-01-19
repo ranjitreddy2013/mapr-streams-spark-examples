@@ -32,11 +32,11 @@ public class JsonUtil {
 
     private static String transformedDate(String dateString) {
         SimpleDateFormat origDateFormat, desiredOutputFormat;
-        origDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        origDateFormat = new SimpleDateFormat(Constants.INCOMING_TIME_PATTERN);
         String outputDateString = null;
         try {
             Date date = origDateFormat.parse(dateString);
-            desiredOutputFormat = new SimpleDateFormat("dd-MM-yyyy");
+            desiredOutputFormat = new SimpleDateFormat(Constants.PARTITION_DATE_PATTERN);
             System.out.println("Timestamp in JSON record:" + dateString );
             outputDateString = desiredOutputFormat.format(date);
             System.out.println("New Date:"+ outputDateString);
@@ -47,23 +47,23 @@ public class JsonUtil {
         return  outputDateString;
     }
 
-    private static void mapDeviceType(JsonNode jsonNode) {
-        JsonNode deviceTypeNode = jsonNode.get("device_type");
+    private static void mapDeviceType(JsonNode jsonNode, String tablePath) {
+        JsonNode deviceTypeNode = jsonNode.get(Constants.DEVICE_TYPE_IN_JSON);
         String deviceType = deviceTypeNode.asText();
         System.out.println("Device Type:" + deviceType);
-        String mappedTable = HBaseUtil.deviceTableMapping(Constants.TABLE_MAPPING, deviceType, Constants.CF, Constants.COLUMN, 1);
+        String mappedTable = HBaseUtil.deviceTableMapping(tablePath, deviceType, Constants.CF, Constants.COLUMN, 1);
         System.out.println("Mapped Device Type:" + mappedTable);
-        ((ObjectNode) jsonNode).put("table", mappedTable);
-        String transformedDate = transformedDate(jsonNode.get("time").asText());
-        ((ObjectNode) jsonNode).put("date", transformedDate);
+        ((ObjectNode) jsonNode).put(Constants.TABLE_OUT_JSON, mappedTable);
+        String transformedDate = transformedDate(jsonNode.get(Constants.TIME_IN_JSON).asText());
+        ((ObjectNode) jsonNode).put(Constants.DATE_OUT_JSON, transformedDate);
     }
 
-    public static JsonNode transformJson(JsonNode jsonNode) {
+    public static JsonNode transformJson(JsonNode jsonNode, String tablePath) {
 
         flattenJsonNode(jsonNode, Constants.ENRICHED_FIELDS);
         flattenJsonNode(jsonNode, Constants.PARSED_FIELDS);
 
-        mapDeviceType(jsonNode);
+        mapDeviceType(jsonNode, tablePath);
 
         ObjectNode on = (ObjectNode) jsonNode;
         if (jsonNode.isObject()) {
