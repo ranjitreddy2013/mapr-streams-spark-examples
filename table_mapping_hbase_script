@@ -1,0 +1,4 @@
+echo "disable '/user/ranjitlingaiah/devicetablemapping' ; drop '/user/ranjitlingaiah/devicetablemapping'" | hbase shell
+echo "create '/user/ranjitlingaiah/devicetablemapping', 'cf'" | hbase shell
+echo "put '/user/ranjitlingaiah/devicetablemapping', 'apacheag', 'cf:table', 'web'" | hbase shell
+echo "put '/user/ranjitlingaiah/devicetablemapping', 'syslog', 'cf:table', 'network'" | hbase shell
