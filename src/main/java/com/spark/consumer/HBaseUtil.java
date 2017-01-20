@@ -58,7 +58,7 @@ public class HBaseUtil {
 
 
     public static void main(String[] args) throws IOException {
-        String tablePath = "/user/user01/devicetablemapping";
+        String tablePath = "/user/ranjitlingaiah/devicetablemapping";
         try {
             String tableName = HBaseUtil.deviceTableMapping(tablePath, "apacheag", Constants.CF, Constants.COLUMN, 1);
             System.out.println("Tablename:" + tableName);

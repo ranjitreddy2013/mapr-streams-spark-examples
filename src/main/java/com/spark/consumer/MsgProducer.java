@@ -38,7 +38,7 @@ public class MsgProducer {
             /* Add each message to a record. A ProducerRecord object
              identifies the topic or specific partition to publish
              a message to. */
-            ProducerRecord<String, String> rec = new ProducerRecord<>(topic, line);
+            ProducerRecord<String, String> rec = new ProducerRecord<>(topic, "key", line);
 
             // Send the record to the producer client library.
             producer.send(rec);

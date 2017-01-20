@@ -1,8 +1,8 @@
 package com.spark.consumer;
 
 public class Constants {
-    public static final String ENRICHED_FIELDS = "enriched_fields";
-    public static final String PARSED_FIELDS = "parsed_fields";
+    public static final String ENRICHED_FIELDS = "enriched";
+    public static final String PARSED_FIELDS = "parsed";
     public static final String PARTITION_DATE_PATTERN = "dd-MM-yyyy";
     public static final String INCOMING_TIME_PATTERN = "yyyy-MM-dd HH:mm:ss";
 

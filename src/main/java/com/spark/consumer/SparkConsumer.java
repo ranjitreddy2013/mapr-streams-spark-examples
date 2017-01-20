@@ -3,23 +3,32 @@ package com.spark.consumer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.log4j.Level;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction2;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.streaming.Durations;
 import org.apache.spark.streaming.Time;
 import org.apache.spark.streaming.api.java.JavaDStream;
-import org.apache.spark.streaming.api.java.JavaPairInputDStream;
+import org.apache.spark.streaming.api.java.JavaInputDStream;
 import org.apache.spark.streaming.api.java.JavaStreamingContext;
-import org.apache.spark.streaming.kafka.v09.KafkaUtils;
-import scala.Tuple2;
+import org.apache.spark.streaming.kafka09.ConsumerStrategies;
+import org.apache.spark.streaming.kafka09.KafkaUtils;
+import org.apache.spark.streaming.kafka09.LocationStrategies;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.regex.Pattern;
+
 
 
 public final class SparkConsumer {
@@ -36,6 +45,14 @@ public final class SparkConsumer {
             System.exit(1);
         }
 
+        @SuppressWarnings("unchecked")
+
+        List<Logger> loggers = Collections.<Logger>list(LogManager.getCurrentLoggers());
+        loggers.add(LogManager.getRootLogger());
+        for ( Logger logger : loggers ) {
+            logger.setLevel(Level.OFF);
+        }
+
         String topics = args[0];
         final String tablePath = args[1];  //e.g. "/user/ranjitlingaiah/devicetablemapping"
         final String dataWareHouseLocation = args[2];
@@ -48,35 +65,50 @@ public final class SparkConsumer {
 
         // Create context with batch interval
         SparkConf sparkConf = new SparkConf().setAppName("SparkConsumer").setMaster(masterUrl);
+        sparkConf.set("spark.sql.warehouse.dir", "/user/ranjitlingaiah/sw");
 
         JavaStreamingContext jssc = new JavaStreamingContext(sparkConf, Durations.seconds(Integer.parseInt(duration)));
 
         Set<String> topicsSet = new HashSet<>(Arrays.asList(topics.split(",")));
-        Map<String, String> kafkaParams = new HashMap<>();
-        kafkaParams.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-        kafkaParams.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-        kafkaParams.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-        kafkaParams.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+        Map<String, Object> kafkaParams = new HashMap<>();
+//        kafkaParams.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+//        kafkaParams.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+//        kafkaParams.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+//        kafkaParams.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+
+        kafkaParams.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
+        kafkaParams.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
+        kafkaParams.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        kafkaParams.put(ConsumerConfig.GROUP_ID_CONFIG, "mygroup");
+
 
         System.out.println("Topics:" + topics);
 
-        JavaPairInputDStream<String, String> messages = KafkaUtils.createDirectStream(
+//        JavaPairInputDStream<String, String> messages = KafkaUtils.createDirectStream(
+//                jssc,
+//                String.class,
+//                String.class,
+//                kafkaParams,
+//                topicsSet
+//        );
+
+
+
+        final Pattern topicPattern = Pattern.compile(topics + ".*", Pattern.CASE_INSENSITIVE);
+
+        JavaInputDStream<ConsumerRecord<String, String>> messages = KafkaUtils.createDirectStream(
                 jssc,
-                String.class,
-                String.class,
-                kafkaParams,
-                topicsSet
-        );
+                LocationStrategies.PreferConsistent(),
+                ConsumerStrategies.<String, String>SubscribePattern(topicPattern,  kafkaParams));
 
 
-        messages.print();
 
         // Get the lines, split them into words, count the words and print
-        JavaDStream<String> lines = messages.map(new Function<Tuple2<String, String>, String>() {
+        JavaDStream<String> lines = messages.map(new Function<ConsumerRecord<String, String>, String>() {
             @Override
-            public String call(Tuple2<String, String> tuple2) {
+            public String call(ConsumerRecord<String, String> tuple2) {
 
-                String s = tuple2._2();
+                String s = tuple2.value();
                 System.out.println("Incoming json:" + s);
 
                 JsonNode incomingJson = null;
@@ -112,7 +144,7 @@ public final class SparkConsumer {
                     data.printSchema();
                     data.show();
 
-                    data.repartition(1).write().partitionBy("table", "date").parquet(dataWareHouseLocation);
+                    data.repartition(1).write().mode(SaveMode.Append).partitionBy("table", "date").parquet(dataWareHouseLocation);
                 }
             }
         });

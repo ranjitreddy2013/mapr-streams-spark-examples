@@ -16,6 +16,7 @@ public class JsonUtil {
     private static void flattenJsonNode(JsonNode jsonNode, String key) {
         JsonNode enrichedNode = jsonNode.get(key);
 
+        System.out.println(enrichedNode.toString());
         ObjectNode origJson = (ObjectNode) jsonNode;
         if (enrichedNode.isObject()) {
             ObjectNode objectNode = (ObjectNode) enrichedNode;
