@@ -18,7 +18,7 @@ public class MsgProducer {
     public static void main(String[] args) throws IOException {
 
         // Set the default stream and topic to publish to.
-        String topic = "/user/ranjitlingaiah/stream:cdrs";
+        String topic = "/user/ranjitlingaiah/stream:cdrs3";
         String fileName = "/user/ranjitlingaiah/data/parsed_fields.json";
 
         if (args.length == 2) {

@@ -2,7 +2,13 @@ package com.spark.consumer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mapr.db.MapRDB;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableOutputFormat;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.log4j.Level;
@@ -20,6 +26,7 @@ import org.apache.spark.streaming.Durations;
 import org.apache.spark.streaming.Time;
 import org.apache.spark.streaming.api.java.JavaDStream;
 import org.apache.spark.streaming.api.java.JavaInputDStream;
+import org.apache.spark.streaming.api.java.JavaPairDStream;
 import org.apache.spark.streaming.api.java.JavaStreamingContext;
 import org.apache.spark.streaming.kafka09.ConsumerStrategies;
 import org.apache.spark.streaming.kafka09.KafkaUtils;
@@ -28,7 +35,6 @@ import org.apache.spark.streaming.kafka09.LocationStrategies;
 import java.io.IOException;
 import java.util.*;
 import java.util.regex.Pattern;
-
 
 
 public final class SparkConsumer {
@@ -44,6 +50,7 @@ public final class SparkConsumer {
                     "  <master url> is the master url\n\n");
             System.exit(1);
         }
+
 
         @SuppressWarnings("unchecked")
 
@@ -69,6 +76,7 @@ public final class SparkConsumer {
 
         JavaStreamingContext jssc = new JavaStreamingContext(sparkConf, Durations.seconds(Integer.parseInt(duration)));
 
+
         Set<String> topicsSet = new HashSet<>(Arrays.asList(topics.split(",")));
         Map<String, Object> kafkaParams = new HashMap<>();
 //        kafkaParams.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
@@ -82,6 +90,11 @@ public final class SparkConsumer {
         kafkaParams.put(ConsumerConfig.GROUP_ID_CONFIG, "mygroup");
 
 
+        final String fastMessagesTablePath = "/user/ranjitlingaiah/iot-data";
+        final  String tableName = "/user/ranjitlingaiah/readme";
+        final  String columnFamily = "cf";
+
+
         System.out.println("Topics:" + topics);
 
 //        JavaPairInputDStream<String, String> messages = KafkaUtils.createDirectStream(
@@ -91,7 +104,6 @@ public final class SparkConsumer {
 //                kafkaParams,
 //                topicsSet
 //        );
-
 
 
         final Pattern topicPattern = Pattern.compile(topics + ".*", Pattern.CASE_INSENSITIVE);
@@ -110,6 +122,8 @@ public final class SparkConsumer {
 
                 String s = tuple2.value();
                 System.out.println("Incoming json:" + s);
+
+                int i = 1;
 
                 JsonNode incomingJson = null;
                 JsonNode transformedJson = null;
@@ -133,6 +147,16 @@ public final class SparkConsumer {
         });
 
 
+        final  Configuration hbaseconf = HBaseConfiguration.create();
+        hbaseconf.set(TableOutputFormat.OUTPUT_TABLE, tableName);
+        final Configuration jobConf  = new Configuration(hbaseconf);
+        jobConf.set("mapreduce.job.output.key.class", "Text");
+        jobConf.set("mapreduce.job.output.value.class", "Text");
+        jobConf.set("mapreduce.outputformat.class", "org.apache.hadoop.hbase.mapreduce.TableOutputFormat");
+
+        JavaPairDStream<ImmutableBytesWritable, Put> meterPairStream =  lines.mapToPair(new HbasePutConvertFunction());
+        meterPairStream.foreachRDD(new HbaseSaveFunction(hbaseconf, jobConf));
+
 
         lines.foreachRDD(new VoidFunction2<JavaRDD<String>, Time>() {
             @Override
@@ -153,5 +177,14 @@ public final class SparkConsumer {
         // Start the computation
         jssc.start();
         jssc.awaitTermination();
+    }
+
+    private static com.mapr.db.Table getTable(String tablePath) {
+
+        if (!MapRDB.tableExists(tablePath)) {
+            return MapRDB.createTable(tablePath);
+        } else {
+            return MapRDB.getTable(tablePath);
+        }
     }
 }
