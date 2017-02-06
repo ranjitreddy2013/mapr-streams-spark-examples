@@ -19,7 +19,7 @@ public class HbaseSaveFunction implements VoidFunction2<JavaPairRDD<ImmutableByt
     private Configuration jobConf = null;
 //    private final static String tableName = "/user/ranjitlingaiah/readme";
 
-    public HbaseSaveFunction(Configuration hbaseconf, Configuration jobConf) {
+    public HbaseSaveFunction(Configuration jobConf) {
 
         //hbaseconf = HBaseConfiguration.create();
 //        hbaseconf.set(TableOutputFormat.OUTPUT_TABLE, tableName);

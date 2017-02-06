@@ -155,7 +155,7 @@ public final class SparkConsumer {
         jobConf.set("mapreduce.outputformat.class", "org.apache.hadoop.hbase.mapreduce.TableOutputFormat");
 
         JavaPairDStream<ImmutableBytesWritable, Put> meterPairStream =  lines.mapToPair(new HbasePutConvertFunction());
-        meterPairStream.foreachRDD(new HbaseSaveFunction(hbaseconf, jobConf));
+        meterPairStream.foreachRDD(new HbaseSaveFunction(jobConf));
 
 
         lines.foreachRDD(new VoidFunction2<JavaRDD<String>, Time>() {
